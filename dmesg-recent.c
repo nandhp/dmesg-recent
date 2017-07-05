@@ -34,6 +34,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 #include <errno.h>
 
 int main(int argc, char *argv[]) {
@@ -75,14 +76,17 @@ int main(int argc, char *argv[]) {
 
   /* Output new messages */
   while ((nread = getline(&line, &len, stdin)) != -1) {
-    int nel = sscanf(line, "[%lf]", &stamp);
-    if ( nel < 1 ) {
-      if ( stamp > 0 ) {
-        fprintf(stderr, "%s: dmesg parse error: '%s'\n", argv[0], line);
-        rc = 2;
-        break;
+    /* Recent dmesg may have multi-line messages */
+    if ( !isspace(line[0]) ) {
+      int nel = sscanf(line, "[%lf]", &stamp);
+      if ( nel < 1 ) {
+        if ( stamp > 0 ) {
+          fprintf(stderr, "%s: dmesg parse error: '%s'\n", argv[0], line);
+          rc = 2;
+          break;
+        }
+        stamp = 0;
       }
-      stamp = 0;
     }
     if ( stamp > target )
       if ( fwrite(line, nread, 1, stdout) != 1 ) {
