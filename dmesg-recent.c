@@ -36,6 +36,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <unistd.h>
 
 int main(int argc, char *argv[]) {
   const char *stampfile = NULL;
@@ -44,11 +45,34 @@ int main(int argc, char *argv[]) {
   ssize_t nread;
   int rc = 0;
   double target = 0.0, stamp = 0.0;
+  int any_multiline = 0;
 
-  stampfile = argc > 1 ? argv[1] : NULL;
-  if ( !stampfile || argc != 2 ) {
-    fprintf(stderr, "Usage: dmesg | %s <stampfile>\n", argv[0]);
-    return 1;
+  {
+    int want_help = 0, has_error = 0;
+    int opt;
+    while ( (opt = getopt(argc, argv, "slh")) != -1 ) {
+      switch (opt) {
+      case 'l':
+        any_multiline = 1;
+        break;
+      case 's':
+        any_multiline = 0;
+        break;
+      case 'h':
+        want_help = 1;
+        break;
+      default:
+        has_error = 1;
+        break;
+      }
+    }
+    has_error = has_error || (optind + 1 != argc);
+
+    stampfile = has_error ? NULL : argv[optind];
+    if ( has_error || !stampfile || want_help ) {
+      fprintf(stderr, "Usage: dmesg | %s [-m] <stampfile>\n", argv[0]);
+      return want_help ? 0 : 1;
+    }
   }
 
   /* Load stamp file */
@@ -79,7 +103,7 @@ int main(int argc, char *argv[]) {
     /* Recent dmesg may have multi-line messages */
     if ( !isspace(line[0]) ) {
       int nel = sscanf(line, "[%lf]", &stamp);
-      if ( nel < 1 ) {
+      if ( nel < 1 && !any_multiline ) {
         if ( stamp > 0 ) {
           fprintf(stderr, "%s: dmesg parse error: '%s'\n", argv[0], line);
           rc = 2;
